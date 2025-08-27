@@ -55,6 +55,11 @@ vlm = [
 sglang = [
     "sglang[all]>=0.4.7,<0.4.10",
 ]
+lightllm = [
+    "lightllm>=0.1.0",
+    "httpx>=0.27.2",
+    "torch>=2.0.0",
+]
 pipeline = [
     "matplotlib>=3.10,<4",
     "ultralytics>=8.3.48,<9",
@@ -89,6 +94,7 @@ core = [
 all = [
     "mineru[core]",
     "mineru[sglang]",
+    "mineru[lightllm]",
 ]
 pipeline_old_linux = [
     "matplotlib>=3.10,<=3.10.1",

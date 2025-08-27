@@ -15,6 +15,7 @@ from .base_predictor import (
     BasePredictor,
 )
 from .sglang_client_predictor import SglangClientPredictor
+from .lightllm_client_predictor import LightllmClientPredictor
 
 hf_loaded = False
 try:
@@ -24,16 +25,22 @@ try:
 except ImportError as e:
     logger.warning("hf is not installed. If you are not using transformers, you can ignore this warning.")
 
-engine_loaded = False
+sglang_loaded = False
 try:
     from sglang.srt.server_args import ServerArgs
 
     from .sglang_engine_predictor import SglangEnginePredictor
 
-    engine_loaded = True
+    sglang_loaded = True
 except Exception as e:
     logger.warning("sglang is not installed. If you are not using sglang, you can ignore this warning.")
 
+lightllm_loaded = False
+try:
+    from .lightllm_engine_predictor import LightllmEnginePredictor
+    lightllm_loaded = True
+except Exception as e:
+    logger.warning("lightllm is not installed. If you are not using lightllm, you can ignore this warning.")
 
 def get_predictor(
     backend: str = "sglang-client",
@@ -73,7 +80,7 @@ def get_predictor(
     elif backend == "sglang-engine":
         if not model_path:
             raise ValueError("model_path must be provided for sglang-engine backend.")
-        if not engine_loaded:
+        if not sglang_loaded:
             raise ImportError(
                 "sglang is not installed, so sglang-engine backend cannot be used. "
                 "If you need to use sglang-engine backend for inference, "
@@ -103,8 +110,42 @@ def get_predictor(
             max_new_tokens=max_new_tokens,
             http_timeout=http_timeout,
         )
+    elif backend == "lightllm-client":
+        if not server_url:
+            raise ValueError("server_url must be provided for lightllm-client backend.")
+        predictor = LightllmClientPredictor(
+            server_url=server_url,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
+            presence_penalty=presence_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            max_new_tokens=max_new_tokens,
+            http_timeout=http_timeout,
+        )
+    elif backend == "lightllm-engine":
+        if not model_path:
+            raise ValueError("model_path must be provided for lightllm-engine backend.")
+        if not lightllm_loaded:
+            raise ImportError(
+                "lightllm is not installed, so lightllm-engine backend cannot be used. "
+                "If you need to use lightllm-engine backend for inference, "
+                "please install lightllm first."
+            )
+        predictor = LightllmEnginePredictor(
+            model_path=model_path,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
+            presence_penalty=presence_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            max_new_tokens=max_new_tokens,
+            **kwargs,
+        )
     else:
-        raise ValueError(f"Unsupported backend: {backend}. Supports: transformers, sglang-engine, sglang-client.")
+        raise ValueError(f"Unsupported backend: {backend}. Supports: transformers, sglang-engine, sglang-client, lightllm-engine, lightllm-client.")
 
     elapsed = round(time.time() - start_time, 2)
     logger.info(f"get_predictor cost: {elapsed}s")
