@@ -3,13 +3,13 @@ import os
 import torch
 from typing import List, Tuple, Union
 
-from lightllm.server.api_cli import make_argument_parser
-from lightllm.server.api_start import normal_or_p_d_start
-from lightllm.server.api_http import g_objs
-from lightllm.server.api_http import SamplingParams as LightllmSamplingParams
-from lightllm.server.api_http import MultimodalParams as LightllmMultimodalParams
-from lightllm.server.core.objs.req import FinishStatus
-from lightllm.utils.log_utils import init_logger
+from lightllm.lightllm.server.api_cli import make_argument_parser
+from lightllm.lightllm.server.api_start import normal_or_p_d_start
+from lightllm.lightllm.server.api_http import g_objs
+from lightllm.lightllm.server.api_http import SamplingParams as LightllmSamplingParams
+from lightllm.lightllm.server.api_http import MultimodalParams as LightllmMultimodalParams
+from lightllm.lightllm.server.core.objs.req import FinishStatus
+from lightllm.lightllm.utils.log_utils import init_logger
 
 logger = init_logger(__name__)
 

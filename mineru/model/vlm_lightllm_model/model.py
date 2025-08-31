@@ -1,7 +1,7 @@
 from typing import Iterable, List, Optional, Tuple, Union
 
-from lightllm.models.qwen2_vl.model import Qwen2VLTpPartModel
-from lightllm.models.registry import ModelRegistry
+from lightllm.lightllm.models.qwen2_vl.model import Qwen2VLTpPartModel
+from lightllm.lightllm.models.registry import ModelRegistry
 
 
 @ModelRegistry("mineru2_qwen", is_multimodal=True)
