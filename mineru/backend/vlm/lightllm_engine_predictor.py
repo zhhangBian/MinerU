@@ -5,9 +5,9 @@ from base64 import b64encode
 from pathlib import Path
 from typing import AsyncIterable, Iterable, List, Optional, Union
 
-from lightllm.lightllm.server.api_http import SamplingParams as LightllmSamplingParams
-from lightllm.lightllm.server.api_http import MultimodalParams as LightllmMultimodalParams
-from lightllm.lightllm.utils.log_utils import init_logger
+from lightllm.server.api_http import SamplingParams as LightllmSamplingParams
+from lightllm.server.api_http import MultimodalParams as LightllmMultimodalParams
+from lightllm.utils.log_utils import init_logger
 
 from ...model.vlm_lightllm_model.engine import BatchEngine
 from .base_predictor import (
