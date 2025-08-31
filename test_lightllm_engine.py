@@ -4,16 +4,6 @@ from lightllm_src import *
 def test_lightllm_engine():
     """测试LightLLM引擎"""
     try:
-        # 首先确保模型模块被导入
-        print("正在导入MinerU LightLLM模型模块...")
-        try:
-            from mineru.model.vlm_lightllm_model import model
-            print("✅ 成功导入MinerU LightLLM模型模块")
-        except ImportError as e:
-            print(f"❌ 导入模型模块失败: {e}")
-            print("请检查模型模块路径和依赖")
-            return False
-
         from mineru.backend.vlm.lightllm_engine_predictor import LightllmEnginePredictor
 
         print("正在测试LightLLM引擎...")

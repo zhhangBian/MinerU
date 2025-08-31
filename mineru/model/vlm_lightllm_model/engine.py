@@ -5,7 +5,6 @@ from typing import List, Tuple, Union
 
 from lightllm.server.api_cli import make_argument_parser
 from lightllm.server.api_start import normal_or_p_d_start
-from lightllm.server.api_http import g_objs
 from lightllm.server.api_http import SamplingParams as LightllmSamplingParams
 from lightllm.server.api_http import MultimodalParams as LightllmMultimodalParams
 from lightllm.server.core.objs.req import FinishStatus
@@ -36,6 +35,7 @@ class BatchEngine():
 
     def init_engine(self):
         normal_or_p_d_start(self.args)
+        from lightllm.server.api_http import g_objs
         self.http_server_manager = g_objs.httpserver_manager
 
     def get_tokenizer(self):
