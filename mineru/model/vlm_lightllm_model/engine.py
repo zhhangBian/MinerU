@@ -70,7 +70,7 @@ class BatchEngine():
             request=None,
             is_health_req=is_health_req,
         )
-        
+
     async def shutdown(self):
         logger.info("Received signal to shutdown. Performing graceful shutdown...")
         asyncio.sleep(3)
