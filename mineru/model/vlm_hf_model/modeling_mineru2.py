@@ -17,6 +17,7 @@ from .configuration_mineru2 import Mineru2QwenConfig
 from .image_processing_mineru2 import Mineru2ImageProcessor, get_anyres_image_grid_shape
 
 
+# 封装了一层vision tower
 class SiglipVisionTower(nn.Module):
     def __init__(self, vision_tower):
         super().__init__()
@@ -77,6 +78,7 @@ class SiglipVisionTower(nn.Module):
         return self.config.image_size
 
 
+# 构建多模态视觉塔
 def build_vision_tower(config: Mineru2QwenConfig):
     vision_tower = getattr(config, "mm_vision_tower", getattr(config, "vision_tower", ""))
     model_path = getattr(config, "_name_or_path", "")
@@ -88,6 +90,7 @@ def build_vision_tower(config: Mineru2QwenConfig):
     raise ValueError(f"Unknown vision tower: {vision_tower}")
 
 
+# 构建多模态视觉塔的投影头
 def build_vision_projector(config: Mineru2QwenConfig):
     projector_type = getattr(config, "mm_projector_type", "linear")
 
@@ -109,6 +112,7 @@ def build_vision_projector(config: Mineru2QwenConfig):
     raise ValueError(f"Unknown projector type: {projector_type}")
 
 
+# 构建多模态
 class Mineru2QwenModel(Qwen2Model):
     config_class = Mineru2QwenConfig
 
@@ -122,6 +126,7 @@ class Mineru2QwenModel(Qwen2Model):
             self.image_newline = nn.Parameter(torch.empty(config.hidden_size, dtype=self.dtype))
 
 
+# 在qwen的基础上手动做模态融合，将图片特征插入到文本特征中
 class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
     config_class = Mineru2QwenConfig
 
@@ -140,15 +145,19 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
     def get_model(self):
         return self.model
 
+    # 进行相应的编码过程
     def encode_images(self, images: torch.Tensor):
         image_features = self.get_model().vision_tower(images)
         image_features = self.get_model().mm_projector(image_features)
         return image_features
 
+    # 将图片的像素特征插入到文本特征中
     def prepare_inputs_labels_for_multimodal(
         self, input_ids, position_ids, attention_mask, past_key_values, labels, images, image_sizes=None
     ):
+        # 得到相应的vision tower
         vision_tower = self.get_model().vision_tower
+        # 如果vision tower为None，或者图片为None，或者输入的文本token序列长度为1，则直接返回
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
@@ -241,6 +250,9 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
         else:
             image_features = self.encode_images(images)
 
+        # 对于编码后的图像数据
+
+        # 标签/掩码prepare，attention、label初始化与掩盖
         _labels = labels
         _position_ids = position_ids
         _attention_mask = attention_mask
@@ -258,6 +270,7 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
         input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
         labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
 
+        # 以 image_token_index 为锚点，将图片embedding穿插到文本embedding中，并同步更新labels
         new_input_embeds = []
         new_labels = []
         cur_image_idx = 0
@@ -381,6 +394,7 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
 
         return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
+    # 进行正式的forward过程
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -398,12 +412,14 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
+        # 将图片特征插入到文本特征中
         if inputs_embeds is None:
             (input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels) = (
                 self.prepare_inputs_labels_for_multimodal(
                     input_ids, position_ids, attention_mask, past_key_values, labels, images, image_sizes
                 )
             )
+        # 调用qwen的forward过程
         return super().forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -430,12 +446,15 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
         if "inputs_embeds" in kwargs:
             raise NotImplementedError("`inputs_embeds` is not supported")
 
+        # 将图片特征插入到文本特征中
         inputs, position_ids, attention_mask, _, inputs_embeds, _ = self.prepare_inputs_labels_for_multimodal(
             inputs, position_ids, attention_mask, None, None, images, image_sizes=image_sizes
         )
 
+        # 调用qwen的generate过程
         return super().generate(position_ids=position_ids, attention_mask=attention_mask, inputs_embeds=inputs_embeds, **kwargs)
 
+    # 进行相应的prepare_inputs_for_generation过程
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
         images = kwargs.pop("images", None)
         image_sizes = kwargs.pop("image_sizes", None)

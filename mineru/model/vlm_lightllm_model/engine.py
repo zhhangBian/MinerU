@@ -13,10 +13,6 @@ from lightllm.utils.log_utils import init_logger
 logger = init_logger(__name__)
 
 class BatchEngine():
-    """
-    The engine is patched to support batch multi-modal generate, and early image preprocessing.
-    """
-
     def __init__(
         self,
         model_path: str,

@@ -69,6 +69,7 @@ class LightllmEnginePredictor(BasePredictor):
         self,
         multimodal_params: dict,
     ) -> LightllmMultimodalParams:
+        print(f"[debug] multimodal_params: {multimodal_params}")
         multimodal_params = LightllmMultimodalParams(**multimodal_params)
         return multimodal_params
 
@@ -151,6 +152,7 @@ class LightllmEnginePredictor(BasePredictor):
             sampling_params=lightllm_sampling_params,
             multimodal_params=lightllm_multimodal_params,
         )
+        print(f"[debug] output: {output}")
         return [item["text"] for item in output]
 
     def stream_predict(

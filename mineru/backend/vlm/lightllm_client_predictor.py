@@ -113,8 +113,9 @@ class LightllmClientPredictor(BasePredictor):
         if max_new_tokens is None:
             max_new_tokens = self.max_new_tokens
 
+        print(f"[debug] max_new_tokens: {max_new_tokens}")
         parameter = {
-            "max_new_tokens": max_new_tokens,
+            "max_new_tokens": max_new_tokens // 2,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
@@ -170,7 +171,7 @@ class LightllmClientPredictor(BasePredictor):
         request_body = self.build_request_body(image, prompt, parameters)
         response = httpx.post(self.server_url, json=request_body, timeout=self.http_timeout)
         response_body = response.json()
-        return response_body["text"]
+        return response_body["generated_text"][0]
 
     def batch_predict(
         self,
@@ -249,7 +250,9 @@ class LightllmClientPredictor(BasePredictor):
                 if finished:
                     break
                 token = data.get("token", "")
-                text = token.get("text", "")
+                text = token.get("generated_text", "")
+                if isinstance(text, list):
+                    text = text[0]
                 if text:
                     yield text
 
@@ -291,7 +294,8 @@ class LightllmClientPredictor(BasePredictor):
             response = await async_client.post(self.server_url, json=request_body)
             response_body = response.json()
 
-        return response_body["text"]
+        print(f"[debug] response_body: {response_body}")
+        return response_body["generated_text"][0]
 
     async def aio_batch_predict(
         self,
@@ -443,6 +447,8 @@ class LightllmClientPredictor(BasePredictor):
                     if finished:
                         break
                     token = chunk.get("token", "")
-                    text = token.get("text", "")
+                    text = token.get("generated_text", "")
+                    if isinstance(text, list):
+                        text = text[0]
                     if text:
                         yield text
