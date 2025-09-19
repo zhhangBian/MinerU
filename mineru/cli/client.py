@@ -49,12 +49,14 @@ from .common import do_parse, read_fn, pdf_suffixes, image_suffixes
     '-b',
     '--backend',
     'backend',
-    type=click.Choice(['pipeline', 'vlm-transformers', 'vlm-sglang-engine', 'vlm-sglang-client']),
+    type=click.Choice(['pipeline', 'vlm-transformers', 'vlm-sglang-engine', 'vlm-sglang-client', 'vlm-lightllm-engine', 'vlm-lightllm-client']),
     help="""the backend for parsing pdf:
     pipeline: More general.
     vlm-transformers: More general.
     vlm-sglang-engine: Faster(engine).
     vlm-sglang-client: Faster(client).
+    vlm-lightllm-engine: Lightweight local engine (experimental).
+    vlm-lightllm-client: OpenAI-compatible client to LightLLM server.
     without method specified, pipeline will be used by default.""",
     default='pipeline',
 )
