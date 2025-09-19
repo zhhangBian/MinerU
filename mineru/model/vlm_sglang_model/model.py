@@ -60,27 +60,22 @@ class Mineru2QwenForCausalLM(nn.Module):
     def __init__(
         self,
         config: Mineru2QwenConfig,
-        # 量化配置
         quant_config: Optional[QuantizationConfig] = None,
         prefix: str = "",
     ) -> None:
         super().__init__()
         self.config = config
 
-        # 如果projector_hidden_act为None，则设置为gelu
         if getattr(self.config, "projector_hidden_act", None) is None:
             self.config.projector_hidden_act = "gelu"
-        # 如果image_token_index为None，则设置为151646
         if getattr(self.config, "image_token_index", None) is None:
             self.config.image_token_index = 151646
 
-        # 进行vision tower相应的加载
         # load vision tower
         mm_vision_tower = self.config.mm_vision_tower
         model_root_path = auto_download_and_get_model_root_path(mm_vision_tower, "vlm")
         mm_vision_tower = f"{model_root_path}/{mm_vision_tower}"
 
-        # 按照不同的方式进行加载
         if "clip" in mm_vision_tower:
             vision_config = CLIPVisionConfig.from_pretrained(mm_vision_tower)
             self.vision_tower = CLIPVisionModel(vision_config)  # type: ignore
@@ -92,12 +87,10 @@ class Mineru2QwenForCausalLM(nn.Module):
         else:
             raise ValueError(f"Unexpected mm_vision_tower: {mm_vision_tower}")
 
-        # 视觉投影头
         ### EDIT: change projector
         # the name `projector` contains `proj` which is often used in attention layers, which can cause bugs in quantization.
         self.multi_modal_mlp = build_vision_projector(config)
 
-        # 语言模型选择qwen2
         self.language_model = Qwen2ForCausalLM(
             config,
             quant_config=quant_config,
@@ -128,7 +121,6 @@ class Mineru2QwenForCausalLM(nn.Module):
         else:
             raise ValueError(f"Unexpected select feature: {self.select_feature}")
 
-    # no use
     def pad_input_ids(self, input_ids: List[int], image_inputs):
 
         image_sizes = flatten_nested_list([item.image_sizes for item in image_inputs.mm_items])
@@ -187,8 +179,6 @@ class Mineru2QwenForCausalLM(nn.Module):
         image_inputs.image_offsets = offset_list
         return input_ids
 
-    # 将输入的图片像素pixel_values送入视觉塔（CLIP/SigLIP），抽取指定层的特征，再交给多模态MLP（投影头）变换
-    # 转换后符合语言模型输入的图像embedding特征
     def encode_images(self, pixel_values: torch.Tensor) -> torch.Tensor:
         pixel_values = pixel_values.to(device=self.vision_tower.device, dtype=self.vision_tower.dtype)
         image_outputs = self.vision_tower(pixel_values, output_hidden_states=True)
@@ -208,32 +198,25 @@ class Mineru2QwenForCausalLM(nn.Module):
     @torch.no_grad()
     def forward(
         self,
-        # 文本token序列，可能包括image token，占位插图像embedding
         input_ids: torch.LongTensor,
-        # 每个token的位置信息
         positions: torch.Tensor,
-        # 包括输入中的所有数据
         forward_batch: ForwardBatch,
     ) -> torch.Tensor:
 
-        # 对应于sglang中的MultimodalInputs
         image_inputs = forward_batch.mm_inputs
 
         if image_inputs is None:
             image_inputs = []
 
-        # 当前是扩写/生成阶段，需要对image进行处理
         if forward_batch.forward_mode.is_extend():
             # Clamp input ids. This is because the input_ids for the image tokens are
             # filled with the hash values of the image for the prefix matching in the radix attention.
             # There values are useless because their embeddings will be replaced by vision embeddings anyway.
-            # 图像token位通常用哈希做词表前缀匹配，这里统一clamp到vocab范围
             input_ids.clamp_(min=0, max=self.config.vocab_size - 1)
 
             # Embed text inputs
             input_embeds = self.language_model.model.embed_tokens(input_ids)
 
-            # 统计batch内所有多模态特征结构
             # Got List[List[str]] extend it to List[str]
             # The length of the List should be equal to batch size
             modalities_list = []
@@ -246,16 +229,12 @@ class Mineru2QwenForCausalLM(nn.Module):
                 else:
                     max_image_offset.append(-1)
 
-            # 确定哪些样本需要插入视觉特征
             start_positions = positions[forward_batch.extend_start_loc].cpu().numpy()
-            # 只有“正在解码位置<=图片embedding预计插入起始点”的batch才会执行视觉融合，否则就是普通文本生成
             need_vision = start_positions <= np.array(max_image_offset)
 
-            # 视觉特征提取与对齐
             if need_vision.any():
                 bs = forward_batch.batch_size
 
-                # 拍平像素/尺寸信息
                 if version.parse(sglang_version) >= version.parse("0.4.9.post3"):
                     # sglang >= 0.4.9.post3
                     pixel_values = flatten_nested_list(
@@ -279,7 +258,6 @@ class Mineru2QwenForCausalLM(nn.Module):
 
                 ########## Encode Image ########
 
-                # 编码图片：送入视觉塔，再送projector，得到image_features
                 if pixel_values[0].ndim == 4:
                     # llava-hd: BS, num_patch, C=3, H=336, W=336, num_patch obtained from process_images
                     np.concatenate(pixel_values, axis=0)
@@ -298,7 +276,6 @@ class Mineru2QwenForCausalLM(nn.Module):
                     image_features = self.encode_images(pixel_values)
                     # image_features: BS, 576, 4096
 
-                # 对齐图片：将图片特征与文本特征对齐
                 if self.mm_patch_merge_type.startswith("spatial"):
                     new_image_features = []
                     height = width = self.num_patches_per_side
@@ -407,7 +384,6 @@ class Mineru2QwenForCausalLM(nn.Module):
                 extend_seq_lens = forward_batch.extend_seq_lens.cpu().numpy()
                 prefix_lens_cpu = forward_batch.extend_prefix_lens_cpu
                 pt = 0
-                # 将视觉embedding插入到文本embedding流
                 for i in range(bs):
                     if not need_vision[i]:
                         continue
@@ -426,12 +402,10 @@ class Mineru2QwenForCausalLM(nn.Module):
                         tmp_image_feature = image_features[pt][image_idx]
                         pad_len = tmp_image_feature.shape[0]
 
-                        # 定位文本embeddings的插入区间
                         input_offset = image_offset - prefix_len
                         left_idx = start_idx + input_offset
                         right_idx = left_idx + pad_len
                         assert right_idx > start_idx
-                        # 对特殊case做范围裁剪
                         if input_offset < 0:
                             left_idx = start_idx
                             tmp_image_feature = tmp_image_feature[-input_offset:]
@@ -439,7 +413,6 @@ class Mineru2QwenForCausalLM(nn.Module):
                             tmp_image_feature = tmp_image_feature[: start_idx + seq_len - right_idx]
                             right_idx = start_idx + seq_len
                         try:
-                            # 将图片embedding插入到文本embedding流
                             input_embeds[left_idx:right_idx] = tmp_image_feature
                         except RuntimeError as e:
                             print(f"RuntimeError in image encoding: {e}")
@@ -447,9 +420,7 @@ class Mineru2QwenForCausalLM(nn.Module):
                             print(f"{start_idx=}, {image_offset=}, {prefix_len=}, {pad_len=}")
                     pt += 1
 
-            # 完成多模态融合后的正式语言模型推理
             return self.language_model(input_ids, positions, forward_batch, input_embeds=input_embeds)
-        # decode阶段直接进行推理
         elif forward_batch.forward_mode.is_decode():
             return self.language_model(input_ids, positions, forward_batch)
         else:
