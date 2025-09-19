@@ -171,6 +171,16 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
             mm_patch_merge_type = getattr(self.config, "mm_patch_merge_type", "flat")
             image_aspect_ratio = getattr(self.config, "image_aspect_ratio", "square")
             if mm_patch_merge_type == "flat":
+                # [debug] 详细打印 flat 合并的 token 计算
+                try:
+                    P = self.get_model().vision_tower.num_patches_per_side
+                    N = P * P
+                    for img_i, x in enumerate(image_features):
+                        crops = x.shape[0]
+                        expected_tokens = crops * N
+                        print(f"[debug][flat] img {img_i}: P={P}, N={N}, crops={crops}, tokens_per_image={expected_tokens}")
+                except Exception as e:
+                    print(f"[debug][flat] failed to compute stats: {e}")
                 image_features = [x.flatten(0, 1) for x in image_features]
             elif mm_patch_merge_type.startswith("spatial"):
                 new_image_features = []
@@ -193,6 +203,15 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                                 self.get_model().vision_tower.config.image_size,
                             )
                             image_feature = image_feature.view(num_patch_height, num_patch_width, height, width, -1)
+                            # [debug] 打印网格/基础参数
+                            try:
+                                P = self.get_model().vision_tower.num_patches_per_side
+                                N = P * P
+                                Nx, Ny = num_patch_width, num_patch_height
+                                crops = 1 + Nx * Ny
+                                print(f"[debug][spatial] img {image_idx}: P={P}, N={N}, Nx={Nx}, Ny={Ny}, crops={crops}")
+                            except Exception as e:
+                                print(f"[debug][spatial] failed to compute grid stats: {e}")
                         else:
                             raise NotImplementedError
                         if (
@@ -205,6 +224,15 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                             image_feature = image_feature.flatten(1, 2).flatten(2, 3)
                             c, h, w = image_feature.shape
                             times = math.sqrt(h * w / (max_num_patches * unit**2))
+                            try:
+                                h2, w2 = (int(h // times), int(w // times)) if times > 1.1 else (h, w)
+                                newline_count = h2
+                                expected_extra_tokens = h2 * (w2 + 1)
+                                print(
+                                    f"[debug][spatial+unpad+anyres_max] img {image_idx}: h={h}, w={w}, times={times:.4f}, h'={h2}, w'={w2}, newline={newline_count}, extra_tokens~={expected_extra_tokens}"
+                                )
+                            except Exception as e:
+                                print(f"[debug][spatial+unpad+anyres_max] stat error pre-interp: {e}")
                             if times > 1.1:
                                 image_feature = image_feature[None]
                                 image_feature = nn.functional.interpolate(
@@ -220,9 +248,20 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                                 dim=-1,
                             )
                             image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                            try:
+                                print(f"[debug][spatial+unpad+anyres_max] img {image_idx}: extra_tokens_actual={image_feature.shape[0]}")
+                            except Exception as e:
+                                print(f"[debug][spatial+unpad+anyres_max] stat error post-flatten: {e}")
                         elif "unpad" in mm_patch_merge_type:
                             image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
                             image_feature = image_feature.flatten(1, 2).flatten(2, 3)
+                            try:
+                                c, h, w = image_feature.shape
+                                newline_count = h
+                                expected_extra_tokens = h * (w + 1)
+                                print(f"[debug][spatial+unpad] img {image_idx}: h={h}, w={w}, newline={newline_count}, extra_tokens~={expected_extra_tokens}")
+                            except Exception as e:
+                                print(f"[debug][spatial+unpad] stat error pre-cat: {e}")
                             image_feature = torch.cat(
                                 (
                                     image_feature,
@@ -233,22 +272,57 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                                 dim=-1,
                             )
                             image_feature = image_feature.flatten(1, 2).transpose(0, 1)
+                            try:
+                                print(f"[debug][spatial+unpad] img {image_idx}: extra_tokens_actual={image_feature.shape[0]}")
+                            except Exception as e:
+                                print(f"[debug][spatial+unpad] stat error post-flatten: {e}")
                         else:
                             image_feature = image_feature.permute(0, 2, 1, 3, 4).contiguous()
                             image_feature = image_feature.flatten(0, 3)
+                            try:
+                                P = self.get_model().vision_tower.num_patches_per_side
+                                N = P * P
+                                expected_extra_tokens = num_patch_width * num_patch_height * N
+                                print(f"[debug][spatial] img {image_idx}: expected_extra_tokens={expected_extra_tokens}, extra_tokens_actual={image_feature.shape[0]}")
+                            except Exception as e:
+                                print(f"[debug][spatial] stat error (no-unpad): {e}")
                         image_feature = torch.cat((base_image_feature, image_feature), dim=0)
+                        try:
+                            total_tokens = image_feature.shape[0]
+                            base_tokens = base_image_feature.shape[0]
+                            extra_tokens = total_tokens - base_tokens
+                            print(f"[debug][spatial] img {image_idx}: base_tokens={base_tokens}, extra_tokens={extra_tokens}, total_tokens={total_tokens}")
+                        except Exception as e:
+                            print(f"[debug][spatial] stat error (concat): {e}")
                     else:
                         image_feature = image_feature[0]
                         if "unpad" in mm_patch_merge_type:
                             image_feature = torch.cat(
                                 (image_feature, self.model.image_newline[None].to(image_feature.device)), dim=0
                             )
+                        try:
+                            P = self.get_model().vision_tower.num_patches_per_side
+                            N = P * P
+                            newline_count = 1 if "unpad" in mm_patch_merge_type else 0
+                            print(f"[debug][single-crop] img {image_idx}: P={P}, N={N}, newline={newline_count}, tokens_total={image_feature.shape[0]}")
+                        except Exception as e:
+                            print(f"[debug][single-crop] stat error: {e}")
                     new_image_features.append(image_feature)
                 image_features = new_image_features
             else:
                 raise ValueError(f"Unexpected mm_patch_merge_type: {self.config.mm_patch_merge_type}")
         else:
             image_features = self.encode_images(images)
+
+        # [debug] 打印每张图片的视觉 token 数
+        try:
+            if isinstance(image_features, list):
+                per_image_token_counts = [feat.shape[0] for feat in image_features]
+            else:
+                per_image_token_counts = [image_features[i].shape[0] for i in range(image_features.shape[0])]
+            print(f"[debug] image token counts per image: {per_image_token_counts}")
+        except Exception as e:
+            print(f"[debug] failed to compute image token counts: {e}")
 
         # 对于编码后的图像数据
 
@@ -282,6 +356,7 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                 cur_input_embeds = torch.cat([cur_input_embeds_1, cur_image_features[0:0]], dim=0)
                 new_input_embeds.append(cur_input_embeds)
                 new_labels.append(labels[batch_idx])
+                print(f"[debug] batch {batch_idx}: no <image> token; image tokens = {cur_image_features.shape[0]} (not inserted)")
                 cur_image_idx += 1
                 continue
 
@@ -305,6 +380,7 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
                 cur_new_labels.append(cur_labels_noim[i])
                 if i < num_images:
                     cur_image_features = image_features[cur_image_idx]
+                    print(f"[debug] batch {batch_idx}: inserting image tokens = {cur_image_features.shape[0]}")
                     cur_image_idx += 1
                     cur_new_input_embeds.append(cur_image_features)
                     cur_new_labels.append(
@@ -317,6 +393,7 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
 
             cur_new_input_embeds = torch.cat(cur_new_input_embeds)
             cur_new_labels = torch.cat(cur_new_labels)
+            print(f"[debug] batch {batch_idx}: new sequence length (with images) = {cur_new_input_embeds.shape[0]}")
 
             new_input_embeds.append(cur_new_input_embeds)
             new_labels.append(cur_new_labels)
@@ -326,6 +403,8 @@ class Mineru2QwenForCausalLM(Qwen2ForCausalLM):
         if tokenizer_model_max_length is not None:
             new_input_embeds = [x[:tokenizer_model_max_length] for x in new_input_embeds]
             new_labels = [x[:tokenizer_model_max_length] for x in new_labels]
+
+        print(f"[debug] img len: {tokenizer_model_max_length}")
 
         # Combine them
         max_len = max(x.shape[0] for x in new_input_embeds)

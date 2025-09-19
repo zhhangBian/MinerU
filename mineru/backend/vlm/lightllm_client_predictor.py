@@ -113,7 +113,6 @@ class LightllmClientPredictor(BasePredictor):
         if max_new_tokens is None:
             max_new_tokens = self.max_new_tokens
 
-        print(f"[debug] max_new_tokens: {max_new_tokens}")
         parameter = {
             "max_new_tokens": max_new_tokens // 2,
             "temperature": temperature,

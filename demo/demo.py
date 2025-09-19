@@ -242,6 +242,7 @@ if __name__ == '__main__':
     """Use pipeline mode if your environment does not support VLM"""
     # parse_doc(doc_path_list, output_dir, backend="pipeline")
     parse_doc(doc_path_list, output_dir, backend="vlm-lightllm-client", server_url="http://127.0.0.1:8081")
+    # parse_doc(doc_path_list, output_dir, backend="vlm-transformers", server_url="http://127.0.0.1:8081")
 
     """To enable VLM mode, change the backend to 'vlm-xxx'"""
     # parse_doc(doc_path_list, output_dir, backend="vlm-transformers")  # more general.
