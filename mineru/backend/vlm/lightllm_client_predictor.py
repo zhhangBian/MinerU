@@ -115,6 +115,7 @@ class LightllmClientPredictor(BasePredictor):
 
         parameter = {
             "max_new_tokens": max_new_tokens // 2,
+            "ignore": ,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,

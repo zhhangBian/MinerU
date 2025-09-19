@@ -238,7 +238,6 @@ if __name__ == '__main__':
     """如果您由于网络问题无法下载模型，可以设置环境变量MINERU_MODEL_SOURCE为modelscope使用免代理仓库下载模型"""
     # os.environ['MINERU_MODEL_SOURCE'] = "modelscope"
 
-    print(f"[debug] doc_path_list: {doc_path_list}")
     """Use pipeline mode if your environment does not support VLM"""
     # parse_doc(doc_path_list, output_dir, backend="pipeline")
     parse_doc(doc_path_list, output_dir, backend="vlm-lightllm-client", server_url="http://127.0.0.1:8081")
