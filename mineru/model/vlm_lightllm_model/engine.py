@@ -60,7 +60,6 @@ class BatchEngine():
         args = parser.parse_args(lightllm_args)
 
         # 保持原有的固定设置
-        args.run_mode = "normal"
         args.model_dir = self.model_path
 
         return args
@@ -78,20 +77,21 @@ class BatchEngine():
 
     def init_engine(self):
         """非阻塞方式初始化引擎"""
-        # 在后台线程中启动服务器
-        self._server_thread = threading.Thread(target=self._start_server_thread, daemon=True)
-        self._server_thread.start()
+        # # 在后台线程中启动服务器
+        # self._server_thread = threading.Thread(target=self._start_server_thread, daemon=True)
+        # self._server_thread.start()
 
-        # 等待服务器启动完成（带超时）
-        logger.info("Waiting for lightllm server to start...")
-        if not self._server_started.wait(timeout=120):  # 2分钟超时
-            raise RuntimeError("Lightllm server failed to start within timeout")
+        # # 等待服务器启动完成（带超时）
+        # logger.info("Waiting for lightllm server to start...")
+        # if not self._server_started.wait(timeout=120):  # 2分钟超时
+        #     raise RuntimeError("Lightllm server failed to start within timeout")
+
+        normal_or_p_d_start(self.args)
 
         # 导入全局对象
         try:
             from lightllm.server.api_http import g_objs
             self.http_server_manager = g_objs.httpserver_manager
-            logger.info("Successfully connected to lightllm server")
         except Exception as e:
             logger.error(f"Failed to import g_objs: {e}")
             raise

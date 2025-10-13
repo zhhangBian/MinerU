@@ -114,7 +114,10 @@ def do_parse(
             pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
             local_image_dir, local_md_dir = prepare_env(output_dir, pdf_file_name, parse_method)
             image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
-            middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
+            if backend == "lightllm-engine":
+                middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url, model_path="/mnt/youwei-data/zhuohang/model/opendatalab/MinerU2.0-2505-0.9B")
+            else:
+                middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
 
             pdf_info = middle_json["pdf_info"]
 
@@ -240,7 +243,8 @@ if __name__ == '__main__':
 
     """Use pipeline mode if your environment does not support VLM"""
     # parse_doc(doc_path_list, output_dir, backend="pipeline")
-    parse_doc(doc_path_list, output_dir, backend="vlm-lightllm-client", server_url="http://127.0.0.1:8081")
+    # parse_doc(doc_path_list, output_dir, backend="vlm-lightllm-client", server_url="http://127.0.0.1:8081")
+    parse_doc(doc_path_list, output_dir, backend="vlm-lightllm-engine", server_url="http://127.0.0.1:8081")
     # parse_doc(doc_path_list, output_dir, backend="vlm-transformers", server_url="http://127.0.0.1:8081")
 
     """To enable VLM mode, change the backend to 'vlm-xxx'"""
