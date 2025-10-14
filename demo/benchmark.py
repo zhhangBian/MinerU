@@ -184,6 +184,10 @@ def doc_benchmark(
             file_name_list.append(file_name)
             pdf_bytes_list.append(pdf_bytes)
             lang_list.append(lang)
+
+        output_dir = os.path.join(output_dir, f"{backend}")
+        os.makedirs(output_dir, exist_ok=True)
+
         do_parse(
             output_dir=output_dir,
             pdf_file_names=file_name_list,
@@ -202,7 +206,7 @@ def doc_benchmark(
 if __name__ == '__main__':
     # args
     __dir__ = os.path.dirname(os.path.abspath(__file__))
-    pdf_files_dir = os.path.join(__dir__, "pdfs")
+    pdf_files_dir = os.path.join(__dir__, "imgs")
     output_dir = os.path.join(__dir__, "output")
     pdf_suffixes = ["pdf"]
     image_suffixes = ["png", "jpeg", "jp2", "webp", "gif", "bmp", "jpg"]
