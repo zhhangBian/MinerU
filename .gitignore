@@ -8,7 +8,8 @@ slurm_logs/
 *.egg-info
 demo/
 output/pdfs
-ouytput/imgs
+output/imgs
+output/imgs*
 
 sync1.sh
 data_preprocess_pj1
