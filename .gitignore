@@ -6,6 +6,9 @@ envs/
 slurm_logs/
 
 *.egg-info
+demo/
+output/pdfs
+ouytput/imgs
 
 sync1.sh
 data_preprocess_pj1
