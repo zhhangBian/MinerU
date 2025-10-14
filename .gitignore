@@ -5,6 +5,8 @@ venv*/
 envs/
 slurm_logs/
 
+*.egg-info
+
 sync1.sh
 data_preprocess_pj1
 data-preparation1

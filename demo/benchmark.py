@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -72,6 +73,8 @@ def do_parse(
         if backend.startswith("vlm-"):
             backend = backend[4:]
 
+        time_dict = {}
+
         f_draw_span_bbox = False
         parse_method = "vlm"
         for idx, pdf_bytes in enumerate(pdf_bytes_list):
@@ -79,7 +82,10 @@ def do_parse(
             pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
             local_image_dir, local_md_dir = prepare_env(output_dir, pdf_file_name, parse_method)
             image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
+            start_time = time.time()
             middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
+            end_time = time.time()
+            time_dict[pdf_file_name] = end_time - start_time
 
             pdf_info = middle_json["pdf_info"]
 
@@ -89,6 +95,8 @@ def do_parse(
                 f_dump_md, f_dump_content_list, f_dump_middle_json, f_dump_model_output,
                 f_make_md_mode, middle_json, infer_result, is_pipeline=False
             )
+
+        json.dump(time_dict, open(os.path.join(output_dir, f"{backend}_{time.time()}.json"), "w"), ensure_ascii=False, indent=4)
 
 
 def _process_output(
@@ -156,7 +164,7 @@ def _process_output(
     logger.info(f"local output dir is {local_md_dir}")
 
 
-def parse_doc(
+def doc_benchmark(
         path_list: list[Path],
         output_dir,
         lang="ch",
@@ -166,29 +174,6 @@ def parse_doc(
         start_page_id=0,
         end_page_id=None
 ):
-    """
-        Parameter description:
-        path_list: List of document paths to be parsed, can be PDF or image files.
-        output_dir: Output directory for storing parsing results.
-        lang: Language option, default is 'ch', optional values include['ch', 'ch_server', 'ch_lite', 'en', 'korean', 'japan', 'chinese_cht', 'ta', 'te', 'ka']。
-            Input the languages in the pdf (if known) to improve OCR accuracy.  Optional.
-            Adapted only for the case where the backend is set to "pipeline"
-        backend: the backend for parsing pdf:
-            pipeline: More general.
-            vlm-transformers: More general.
-            vlm-vllm-engine: Faster(engine).
-            vlm-http-client: Faster(client).
-            without method specified, pipeline will be used by default.
-        method: the method for parsing pdf:
-            auto: Automatically determine the method based on the file type.
-            txt: Use text extraction method.
-            ocr: Use OCR method for image-based PDFs.
-            Without method specified, 'auto' will be used by default.
-            Adapted only for the case where the backend is set to "pipeline".
-        server_url: When the backend is `http-client`, you need to specify the server_url, for example:`http://127.0.0.1:30000`
-        start_page_id: Start page ID for parsing, default is 0
-        end_page_id: End page ID for parsing, default is None (parse all pages until the end of the document)
-    """
     try:
         file_name_list = []
         pdf_bytes_list = []
@@ -227,15 +212,4 @@ if __name__ == '__main__':
         if guess_suffix_by_path(doc_path) in pdf_suffixes + image_suffixes:
             doc_path_list.append(doc_path)
 
-    """如果您由于网络问题无法下载模型，可以设置环境变量MINERU_MODEL_SOURCE为modelscope使用免代理仓库下载模型"""
-    # os.environ['MINERU_MODEL_SOURCE'] = "modelscope"
-
-    """Use pipeline mode if your environment does not support VLM"""
-    # parse_doc(doc_path_list, output_dir, backend="pipeline")
-    # parse_doc(doc_path_list, output_dir, backend="vllm-engine")
-    parse_doc(doc_path_list, output_dir, backend="vlm-http-client", server_url="http://127.0.0.1:8081")
-
-    """To enable VLM mode, change the backend to 'vlm-xxx'"""
-    # parse_doc(doc_path_list, output_dir, backend="vlm-transformers")  # more general.
-    # parse_doc(doc_path_list, output_dir, backend="vlm-vllm-engine")  # faster(engine).
-    # parse_doc(doc_path_list, output_dir, backend="vlm-http-client", server_url="http://127.0.0.1:30000")  # faster(client).
+    doc_benchmark(doc_path_list, output_dir, backend="vlm-http-client", server_url="http://127.0.0.1:8081")
