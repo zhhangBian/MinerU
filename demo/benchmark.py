@@ -82,10 +82,21 @@ def do_parse(
             pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
             local_image_dir, local_md_dir = prepare_env(output_dir, pdf_file_name, parse_method)
             image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
-            start_time = time.time()
-            middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
-            end_time = time.time()
-            time_dict[pdf_file_name] = end_time - start_time
+
+            retry_count = 0
+            while retry_count < 3:
+                try:
+                    start_time = time.time()
+                    middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
+                    end_time = time.time()
+                    time_dict[pdf_file_name] = end_time - start_time
+                except Exception as e:
+                    logger.exception(e)
+                    retry_count += 1
+                    time.sleep(1)
+            if retry_count == 3:
+                logger.error(f"Failed to parse {pdf_file_name} after 3 retries")
+                continue
 
             pdf_info = middle_json["pdf_info"]
 
