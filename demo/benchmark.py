@@ -90,6 +90,7 @@ def do_parse(
                     middle_json, infer_result = vlm_doc_analyze(pdf_bytes, image_writer=image_writer, backend=backend, server_url=server_url)
                     end_time = time.time()
                     time_dict[pdf_file_name] = end_time - start_time
+                    break
                 except Exception as e:
                     logger.exception(e)
                     retry_count += 1
