@@ -228,5 +228,5 @@ if __name__ == '__main__':
         if guess_suffix_by_path(doc_path) in pdf_suffixes + image_suffixes:
             doc_path_list.append(doc_path)
 
-    # doc_benchmark(doc_path_list, output_dir, backend="vlm-http-client", server_url="http://127.0.0.1:8081")
-    doc_benchmark(doc_path_list, output_dir, backend="vllm-engine")
+    doc_benchmark(doc_path_list, output_dir, backend="vlm-http-client", server_url="http://127.0.0.1:8087")
+    # doc_benchmark(doc_path_list, output_dir, backend="vllm-engine")

@@ -6,10 +6,12 @@ envs/
 slurm_logs/
 
 *.egg-info
-demo/
-output/pdfs
-output/imgs
-output/imgs*
+demo/output/pdfs
+demo/img*
+demo/img
+
+*.json
+*.csv
 
 sync1.sh
 data_preprocess_pj1

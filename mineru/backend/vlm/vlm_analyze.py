@@ -27,6 +27,7 @@ class ModelSingleton:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    # get or start a model
     def get_model(
         self,
         backend: str,
@@ -42,8 +43,10 @@ class ModelSingleton:
             vllm_llm = None
             vllm_async_llm = None
             batch_size = 0
-            if backend in ['transformers', 'vllm-engine', "vllm-async-engine"] and not model_path:
-                model_path = auto_download_and_get_model_root_path("/","vlm")
+            if backend in ['transformers', 'vllm-engine', "vllm-async-engine"]: # and not model_path:
+                if model_path is None:
+                    model_path = auto_download_and_get_model_root_path("/","vlm")
+
                 if backend == "transformers":
                     try:
                         from transformers import (
@@ -100,6 +103,7 @@ class ModelSingleton:
                         kwargs["logits_processors"] = [MinerULogitsProcessor]
                     # 使用kwargs为 vllm初始化参数
                     vllm_llm = vllm.LLM(**kwargs)
+                    print(f"[debug] init vLLM done")
                 elif backend == "vllm-async-engine":
                     try:
                         from vllm.engine.arg_utils import AsyncEngineArgs
@@ -115,6 +119,7 @@ class ModelSingleton:
                         kwargs["logits_processors"] = [MinerULogitsProcessor]
                     # 使用kwargs为 vllm初始化参数
                     vllm_async_llm = AsyncLLM.from_engine_args(AsyncEngineArgs(**kwargs))
+
             self._models[key] = MinerUClient(
                 backend=backend,
                 model=model,
